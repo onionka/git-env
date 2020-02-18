@@ -1,7 +1,7 @@
 ##
-##          \e[4;36mDashly Backend Makefile\e[0m
+##          \e[4;36mGit Environment-Based Branching Makefile\e[0m
 ##
-##  Provides a lot of usefull shortcuts for building, testing, deploying and running dashly
+##
 ##
 ##  Usage:
 ##
@@ -17,7 +17,8 @@
 ##   \e[33mTargets:\e[0m
 ##     \e[34minstall\e[0m - Installs git environment workflow scripts on this computer
 install:
-	@install --mode="+x" gitenv.sh /usr/bin/gitenv
+	@chmod +x gitenv.sh; \
+     sudo cp -f gitenv.sh /usr/bin/gitenv
 
 ##     \e[34muninstall\e[0m - Installs git environment workflow scripts on this computer
 uninstall:
@@ -39,5 +40,6 @@ SHOW_HELP_HEADER=false
 ##
 ##   \e[33mTargets:\e[0m
 ##     \e[34mhelp\e[0m - Shows this help
+.DEFAULT_GOAL := help
 help: Makefile
 	@echo -e "$$(sed -n 's/^##//p' Makefile)" | less

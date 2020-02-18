@@ -68,7 +68,7 @@ for arg in $@; do
     esac
 done
 
-if [[ ${#@} -ge 1 ]]; then
+if [[ ${#@} -lt 1 ]]; then
   echo "Expected parameters: COMMAND ARGS..." >&2
   exit 1
 fi
@@ -101,6 +101,7 @@ elif [[ "$1" == "push-feature-for" ]]; then
     run git checkout -b ${BRANCH}-${TARGET_BRANCH}
     run git pull --rebase origin ${TARGET_BRANCH}
     run git push origin ${BRANCH}-${TARGET_BRANCH}
+    run git checkout ${BRANCH}
 
     exit 0
 fi
