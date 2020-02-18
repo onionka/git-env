@@ -1,8 +1,6 @@
 ##
 ##          \e[4;36mGit Environment-Based Branching Makefile\e[0m
 ##
-##
-##
 ##  Usage:
 ##
 ##     $ make <targets…> <variables…>
