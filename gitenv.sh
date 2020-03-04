@@ -83,7 +83,7 @@ if [[ "$1" == "create-feature" ]]; then
     TYPE=$3
     NAME=$4
 
-    run git fetch --prune
+    run git fetch
     run git branch ${ISSUE_NUMBER}-${TYPE}-${NAME} origin/master
     run git checkout ${ISSUE_NUMBER}-${TYPE}-${NAME}
 
@@ -98,7 +98,7 @@ elif [[ "$1" == "push-feature-for" ]]; then
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     PUSH_FLAGS=
 
-    run git fetch --prune
+    run git fetch
     if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${TARGET_BRANCH}; then
         echo "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
         run git checkout -b ${BRANCH}-${TARGET_BRANCH}
