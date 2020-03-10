@@ -45,11 +45,11 @@ function show_help() {
 
 function run() {
     if ${verbose}; then
-        echo "Executing '$@'"
+        echo -e " \e[0;32m>>>\e[0m \e[1mExecuting\e[0m '\e[3m$@\e[0m'"
     fi
     if ! $@; then
         if ${verbose}; then
-            echo "Command '$@' failed with $?" >&2
+            echo -e " \e[0;32m>>>\e[0m \e[1mCommand\e[0m '\e[3m$@\e[0m' \e[1mfailed with\e[0m $?" >&2
         fi
         exit 1
     fi
