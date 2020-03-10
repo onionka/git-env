@@ -94,22 +94,27 @@ elif [[ "$1" == "push-feature-for" ]]; then
       exit 1
     fi
 
+    PUSH_FLAGS=
     TARGET_BRANCH=$2
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    PUSH_FLAGS=
+    COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...master \
+              | tr '\n' ' '  \
+              | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')
 
     run git fetch
+
     if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${TARGET_BRANCH}; then
         echo "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
         run git checkout -b ${BRANCH}-${TARGET_BRANCH}
     else
         echo "Branch ${BRANCH}-${TARGET_BRANCH} exists, moving everything there from branch ${BRANCH}"
         run git checkout ${BRANCH}-${TARGET_BRANCH}
-        run git reset --hard ${BRANCH}
         PUSH_FLAGS="${PUSH_FLAGS} --force"
     fi
 
-    run git pull --rebase origin ${TARGET_BRANCH}
+    run git reset --hard ${TARGET_BRANCH}
+    run git cherry-pick ${COMMITS}
+
     run git push origin ${BRANCH}-${TARGET_BRANCH} ${PUSH_FLAGS};
     run git checkout ${BRANCH}
 
