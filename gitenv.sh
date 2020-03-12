@@ -43,40 +43,54 @@ function show_help() {
   exit 0
 }
 
+VISUAL_GUIDE="\e[0;32m>>>\e[0m"
+
+function fmt_bold()     { echo "\e[1m$@\e[0m" }
+function fmt_italic()   { echo "\e[3m$@\e[0m" }
+function fmt_error()    { echo $(bold "\e[31m$@\e[0m") }
+function fmt_success()  { echo "\e[32m$@\e[0m" }
+function fmt_msg()      { echo "\e[30m$(fmt_italic $@)\e[0m" }
+function fmt_code()     { echo "'$(fmt_italic $@)'" }
+
+# Logs message with predefined format
+function info() {
+    echo -e " ${VISUAL_GUIDE} ${1} $@"
+}
+
+# Logs error message with predefined format
+function error() {
+    echo -e " ${VISUAL_GUIDE} ${1} $@" >&2
+}
+
+# Logs error message with predefined format and exits program
+function die() {
+    status_code=$1
+    shift
+
+    error $@
+
+    exit ${status_code}
+}
+
+# Helper function that runs commands like git and prints out what is going to happen
 function run() {
     if ${verbose}; then
-        echo -e " \e[0;32m>>>\e[0m \e[1mExecuting\e[0m '\e[3m$@\e[0m'"
+        info "$(fmt_msg Executing) $(fmt_code $@)"
     fi
+
     if ! $@; then
+        status=$?
         if ${verbose}; then
-            echo -e " \e[0;32m>>>\e[0m \e[1mCommand\e[0m '\e[3m$@\e[0m' \e[1mfailed with\e[0m $?" >&2
+            die 1 "Command $(fmt_code $@) $(fmt_error "failed with status ${status}")"
         fi
         exit 1
     fi
 }
 
-for arg in $@; do
-    case "$arg" in
-        -h|--help)
-            show_help
-            shift
-            ;;
-        -v|--verbose)
-            verbose=1
-            shift
-            ;;
-    esac
-done
-
-if [[ ${#@} -lt 1 ]]; then
-  echo "Expected parameters: COMMAND ARGS..." >&2
-  exit 1
-fi
-
-if [[ "$1" == "create-feature" ]]; then
+# Command that creates new branch from master as a feature branch
+function create_feature() {
     if [[ ${#@} -ne 4 ]]; then
-      echo "Expected parameters: create-feature ISSUE_NUMBER TYPE NAME" >&2
-      exit 1
+      die 1 "Expected parameters: $(fmt_code "create-feature ISSUE_NUMBER TYPE NAME")"
     fi
 
     ISSUE_NUMBER=$2
@@ -88,10 +102,12 @@ if [[ "$1" == "create-feature" ]]; then
     run git checkout ${ISSUE_NUMBER}-${TYPE}-${NAME}
 
     exit 0
-elif [[ "$1" == "push-feature-for" ]]; then
+}
+
+# Creates a new branch derived from
+function push_feature_for() {
     if [[ ${#@} -ne 2 ]]; then
-      echo "Expected parameters: push-feature-for BASE_BRANCH" >&2
-      exit 1
+        die 1 "Expected parameters: $(fmt_code "push-feature-for BASE_BRANCH")"
     fi
 
     PUSH_FLAGS=
@@ -100,8 +116,14 @@ elif [[ "$1" == "push-feature-for" ]]; then
     COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...master \
               | tr '\n' ' '  \
               | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')
+    STASHED=false
 
     run git fetch
+
+    if git diff-index --quiet HEAD --; then
+        run git stash
+        STASHED=true
+    fi
 
     if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${TARGET_BRANCH}; then
         echo "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
@@ -115,8 +137,42 @@ elif [[ "$1" == "push-feature-for" ]]; then
     run git reset --hard ${TARGET_BRANCH}
     run git cherry-pick ${COMMITS}
 
-    run git push origin ${BRANCH}-${TARGET_BRANCH} ${PUSH_FLAGS};
+    run git push origin ${BRANCH}-${TARGET_BRANCH}  ${PUSH_FLAGS};
     run git checkout ${BRANCH}
 
+    if ${STASHED}; then
+        run git stash pop
+    fi
+
     exit 0
+}
+
+# Flag processing
+for arg in $@; do
+    case "$arg" in
+        -h|--help)
+            show_help
+            shift
+            ;;
+        -v|--verbose)
+            verbose=1
+            shift
+            ;;
+    esac
+done
+
+# Processing arguments
+if [[ ${#@} -lt 1 ]]; then
+  die 1 "Expected parameters: COMMAND ARGS..."
 fi
+
+case "$arg" in
+    create-feature)
+        shift
+        create_feature $@
+        ;;
+    push-feature-for)
+        shift
+        push_feature_for $@
+        ;;
+esac
