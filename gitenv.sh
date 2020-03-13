@@ -45,21 +45,38 @@ function show_help() {
 
 VISUAL_GUIDE="\e[0;32m>>>\e[0m"
 
-function fmt_bold()     { echo "\e[1m$@\e[0m" }
-function fmt_italic()   { echo "\e[3m$@\e[0m" }
-function fmt_error()    { echo $(bold "\e[31m$@\e[0m") }
-function fmt_success()  { echo "\e[32m$@\e[0m" }
-function fmt_msg()      { echo "\e[30m$(fmt_italic $@)\e[0m" }
-function fmt_code()     { echo "'$(fmt_italic $@)'" }
+function fmt_bold() {
+    echo "\e[1m$@\e[0m"
+}
+
+function fmt_italic() {
+    echo "\e[3m$@\e[0m"
+}
+
+function fmt_error() {
+    echo "\e[31;3m$@\e[0m"
+}
+
+function fmt_success() {
+    echo "\e[32;3m$@\e[0m"
+}
+
+function fmt_msg() {
+    echo "\e[30;3m$@\e[0m"
+}
+
+function fmt_code() {
+    echo "'$(fmt_italic $@)'"
+}
 
 # Logs message with predefined format
 function info() {
-    echo -e " ${VISUAL_GUIDE} ${1} $@"
+    echo -e " ${VISUAL_GUIDE} $@"
 }
 
 # Logs error message with predefined format
 function error() {
-    echo -e " ${VISUAL_GUIDE} ${1} $@" >&2
+    echo -e " ${VISUAL_GUIDE} $@" >&2
 }
 
 # Logs error message with predefined format and exits program
@@ -81,7 +98,7 @@ function run() {
     if ! $@; then
         status=$?
         if ${verbose}; then
-            die 1 "Command $(fmt_code $@) $(fmt_error "failed with status ${status}")"
+            die 1 "$(fmt_msg "Command") $(fmt_code $@) $(fmt_error "$(fmt_msg "failed with status") ${status}")"
         fi
         exit 1
     fi
@@ -89,13 +106,15 @@ function run() {
 
 # Command that creates new branch from master as a feature branch
 function create_feature() {
-    if [[ ${#@} -ne 4 ]]; then
-      die 1 "Expected parameters: $(fmt_code "create-feature ISSUE_NUMBER TYPE NAME")"
+    # Checking the parameters sanity
+    if [[ ${#@} -ne 3 ]]; then
+        error "$(fmt_error "Expected parameters:") $(fmt_code "gitenv create-feature ISSUE_NUMBER TYPE NAME")"
+        die 1 "$(fmt_error "But has:") $(fmt_code "$@")"
     fi
 
-    ISSUE_NUMBER=$2
-    TYPE=$3
-    NAME=$4
+    ISSUE_NUMBER=$1
+    TYPE=$2
+    NAME=$3
 
     run git fetch
     run git branch ${ISSUE_NUMBER}-${TYPE}-${NAME} origin/master
@@ -106,12 +125,14 @@ function create_feature() {
 
 # Creates a new branch derived from
 function push_feature_for() {
-    if [[ ${#@} -ne 2 ]]; then
-        die 1 "Expected parameters: $(fmt_code "push-feature-for BASE_BRANCH")"
+    # Checking the parameters sanity
+    if [[ ${#@} -ne 1 ]]; then
+        error "$(fmt_error "Expected parameters:") $(fmt_code "gitenv push-feature-for BASE_BRANCH")"
+        die 1 "$(fmt_error "But has:") $(fmt_code "$@")"
     fi
 
     PUSH_FLAGS=
-    TARGET_BRANCH=$2
+    TARGET_BRANCH=$1
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...master \
               | tr '\n' ' '  \
@@ -120,34 +141,41 @@ function push_feature_for() {
 
     run git fetch
 
+    # Stashing unstaged changes
     if git diff-index --quiet HEAD --; then
+        info "Found unstaged changed, storing them into the stash"
         run git stash
         STASHED=true
     fi
 
+    # Creating new branch with -TARGET_BRANCH suffix, or switching to the existing one
     if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${TARGET_BRANCH}; then
-        echo "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
+        info "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
         run git checkout -b ${BRANCH}-${TARGET_BRANCH}
     else
-        echo "Branch ${BRANCH}-${TARGET_BRANCH} exists, moving everything there from branch ${BRANCH}"
+        info "Branch ${BRANCH}-${TARGET_BRANCH} exists, moving everything there from branch ${BRANCH}"
         run git checkout ${BRANCH}-${TARGET_BRANCH}
         PUSH_FLAGS="${PUSH_FLAGS} --force"
     fi
 
+    # Updating branch
     run git reset --hard ${TARGET_BRANCH}
     run git cherry-pick ${COMMITS}
 
-    run git push origin ${BRANCH}-${TARGET_BRANCH}  ${PUSH_FLAGS};
+    # Pushing and returning back to the original branch
+    run git push origin ${BRANCH}-${TARGET_BRANCH}  ${PUSH_FLAGS}
     run git checkout ${BRANCH}
 
+    # Popping stashed unstaged changes
     if ${STASHED}; then
+        info "Popping unstaged changes from stash"
         run git stash pop
     fi
 
     exit 0
 }
 
-# Flag processing
+# Flag processing, this will only search for flags before command
 for arg in $@; do
     case "$arg" in
         -h|--help)
@@ -158,6 +186,10 @@ for arg in $@; do
             verbose=1
             shift
             ;;
+        *)
+            # Stops at the first unknown parameter
+            break
+            ;;
     esac
 done
 
@@ -166,7 +198,7 @@ if [[ ${#@} -lt 1 ]]; then
   die 1 "Expected parameters: COMMAND ARGS..."
 fi
 
-case "$arg" in
+case "$1" in
     create-feature)
         shift
         create_feature $@
@@ -174,5 +206,8 @@ case "$arg" in
     push-feature-for)
         shift
         push_feature_for $@
+        ;;
+    *)
+        die 1 "Unknown argument $(fmt_code $1)"
         ;;
 esac
