@@ -131,18 +131,19 @@ function push_feature_for() {
         die 1 "$(fmt_error "But has:") $(fmt_code "$@")"
     fi
 
+    run git fetch
+
     PUSH_FLAGS=
     TARGET_BRANCH=$1
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...master \
+    COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...origin/master \
               | tr '\n' ' '  \
               | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')
     STASHED=false
 
-    run git fetch
 
     # Stashing unstaged changes
-    if git diff-index --quiet HEAD --; then
+    if ! git diff-index --quiet HEAD --; then
         info "Found unstaged changed, storing them into the stash"
         run git stash
         STASHED=true
