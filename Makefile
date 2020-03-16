@@ -1,11 +1,7 @@
 ##
 ##          \e[4;36mGit Environment-Based Branching Makefile\e[0m
 ##
-##  Usage:
-##
-##     $ make <targets…> <variables…>
-##
-##  Running dependency check for all non-production programs:
+##  Command for installing gitenv script into this environment:
 ##
 ##     $ make install
 ##
