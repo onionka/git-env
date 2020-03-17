@@ -12,11 +12,12 @@ function show_help() {
       develop on each of them independently.
 
   Synopsis:
-    $ gitenv [-h|--help] [-v|--verbose] COMMANDS ARGS
+    $ gitenv [-h|--help] [-v|--verbose] [-s|--stash] COMMANDS ARGS
 
   Switches:
     -h|--help                             Shows this help
     -v|--verbose                          Adds a verbose messages
+    -s|--stash                            Enables auto-stash functionality
 
   Parameters:
 
