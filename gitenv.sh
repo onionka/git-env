@@ -15,15 +15,15 @@ function show_help() {
     $ gitenv [-h|--help] [-v|--verbose] COMMANDS ARGS
 
   Switches:
-    -h|--help                       Shows this help
-    -v|--verbose                    Adds a verbose messages
+    -h|--help                             Shows this help
+    -v|--verbose                          Adds a verbose messages
 
   Parameters:
 
-    COMMANDS                        There are 2 commands that are necessary for developing features:
-       push-feature-for BASE_BRANCH     Creates a new branch from current branch, rebases it from BASE_BRANCH
-                                        and pushes it to the remote so you can create new PR to the BASE_BRANCH
-       create-feature ISSUE TYPE NAME   Creates a new feature from master branch
+    COMMANDS                              There are 2 commands that are necessary for developing features:
+       push-feature-for TARGET_BRANCHES...   Creates a new branch from current branch, rebases it from BASE_BRANCH
+                                             and pushes it to the remote so you can create new PR to the BASE_BRANCH
+       create-feature ISSUE TYPE NAME        Creates a new feature from master branch
 
   Examples:
 
@@ -31,10 +31,14 @@ function show_help() {
 
       $ gitenv create-feature 1234 feat mortgage
 
-    To create a PR from current branch to develop, use this command to push new changes into the remote
+    To create a PR branch from current branch to develop, use this command to push new changes into the remote
     and then create PR in github:
 
       $ gitenv push-feature-for develop
+
+    To create a PR branches in remote for all environments:
+
+      $ gitenv push-feature-for
 
   Author:
 
@@ -84,23 +88,18 @@ function die() {
     status_code=$1
     shift
 
-    error $@
+    error "$@"
 
     exit ${status_code}
 }
 
 # Helper function that runs commands like git and prints out what is going to happen
 function run() {
-    if ${verbose}; then
-        info "$(fmt_msg Executing) $(fmt_code $@)"
-    fi
+    info "$(fmt_msg Executing) $(fmt_code $@)"
 
     if ! $@; then
         status=$?
-        if ${verbose}; then
-            die 1 "$(fmt_msg "Command") $(fmt_code $@) $(fmt_error "$(fmt_msg "failed with status") ${status}")"
-        fi
-        exit 1
+        die 1 "$(fmt_msg "Command") $(fmt_code $@) $(fmt_error "$(fmt_msg "failed with status") ${status}")"
     fi
 }
 
@@ -126,55 +125,76 @@ function create_feature() {
 # Creates a new branch derived from
 function push_feature_for() {
     # Checking the parameters sanity
-    if [[ ${#@} -ne 1 ]]; then
-        error "$(fmt_error "Expected parameters:") $(fmt_code "gitenv push-feature-for BASE_BRANCH")"
-        die 1 "$(fmt_error "But has:") $(fmt_code "$@")"
-    fi
+#    if [[ ${#@} -ne 1 ]]; then
+#        error "$(fmt_error "Expected parameters:") $(fmt_code "gitenv push-feature-for BASE_BRANCH")"
+#        die 1 "$(fmt_error "But has:") $(fmt_code "$@")"
+#    fi
 
     run git fetch
 
-    PUSH_FLAGS=
-    TARGET_BRANCH=$1
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...origin/master \
-              | tr '\n' ' '  \
-              | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')
     STASHED=false
-
 
     # Stashing unstaged changes
     if ! git diff-index --quiet HEAD --; then
-        info "Found unstaged changed, storing them into the stash"
+        ${verbose} && info "Found unstaged changed, storing them into the stash"
         run git stash
         STASHED=true
     fi
 
-    # Creating new branch with -TARGET_BRANCH suffix, or switching to the existing one
-    if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${TARGET_BRANCH}; then
-        info "Branch ${BRANCH}-${TARGET_BRANCH} doesn't exists, creating new one"
-        run git checkout -b ${BRANCH}-${TARGET_BRANCH}
+    # If no params provided, use all environmental branches by default
+    if [[ "$@" == "" ]]; then
+        TARGET_BRANCHES="develop qa master"
+        ${verbose} && info "Using default target branches '${TARGET_BRANCHES}'"
     else
-        info "Branch ${BRANCH}-${TARGET_BRANCH} exists, moving everything there from branch ${BRANCH}"
-        run git checkout ${BRANCH}-${TARGET_BRANCH}
-        PUSH_FLAGS="${PUSH_FLAGS} --force"
+        TARGET_BRANCHES="$@"
     fi
 
-    # Updating branch
-    run git reset --hard ${TARGET_BRANCH}
-    run git cherry-pick ${COMMITS}
+    # Iterating through input environmental branches
+    for target_branch in ${TARGET_BRANCHES}; do
+        # Checks if provided parameters are valid environmental branches
+        if [[ "develop qa master" =~ *${target_branch}* ]]; then
+            error "$(fmt_error "Provided target branch is not from environmental branches")"
+            error "$(fmt_error "   Input parameters:") $(fmt_code "${target_branch}")"
+            die 2 "$(fmt_error "   Expected values:") $(fmt_code "develop qa master")"
+        fi
 
-    # Pushing and returning back to the original branch
-    run git push origin ${BRANCH}-${TARGET_BRANCH}  ${PUSH_FLAGS}
+        GIT_PUSH_FLAGS=
+        COMMITS=$(git log --left-right --cherry-pick --oneline --format='%H' ${BRANCH}...origin/master \
+                  | tr '\n' ' '  \
+                  | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')
+
+        # Creating new branch with -${target_branch} suffix, or switching to the existing one
+        if ! git show-ref --verify --quiet refs/heads/${BRANCH}-${target_branch}; then
+            info "Branch ${BRANCH}-${target_branch} doesn't exists, creating new one"
+            run git checkout -b ${BRANCH}-${target_branch}
+        else
+            info "Branch ${BRANCH}-${target_branch} exists, moving everything there from branch ${BRANCH}"
+            run git checkout ${BRANCH}-${target_branch}
+            GIT_PUSH_FLAGS="${GIT_PUSH_FLAGS} --force"
+        fi
+
+        # Updating branch
+        run git reset --hard ${target_branch}
+        run git cherry-pick ${COMMITS}
+
+        # Pushing and returning back to the original branch
+        run git push origin ${BRANCH}-${target_branch} ${GIT_PUSH_FLAGS}
+    done
+
+    # get back to the feature branch
     run git checkout ${BRANCH}
 
     # Popping stashed unstaged changes
     if ${STASHED}; then
-        info "Popping unstaged changes from stash"
+        ${verbose} && info "Popping unstaged changes from stash"
         run git stash pop
     fi
 
     exit 0
 }
+
+verbose=false
 
 # Flag processing, this will only search for flags before command
 for arg in $@; do
@@ -184,7 +204,7 @@ for arg in $@; do
             shift
             ;;
         -v|--verbose)
-            verbose=1
+            verbose=true
             shift
             ;;
         *)
