@@ -137,6 +137,7 @@ function push_feature_for() {
 
     # Stashing unstaged changes
     if ! git diff-index --quiet HEAD --; then
+        ${stash} || die 3 "Found unstaged changes, commit/stash/remove them before retrying"
         ${verbose} && info "Found unstaged changed, storing them into the stash"
         run git stash
         STASHED=true
@@ -186,7 +187,7 @@ function push_feature_for() {
     run git checkout ${BRANCH}
 
     # Popping stashed unstaged changes
-    if ${STASHED}; then
+    if ${stash} && ${STASHED}; then
         ${verbose} && info "Popping unstaged changes from stash"
         run git stash pop
     fi
@@ -195,6 +196,7 @@ function push_feature_for() {
 }
 
 verbose=false
+stash=false
 
 # Flag processing, this will only search for flags before command
 for arg in $@; do
@@ -205,6 +207,10 @@ for arg in $@; do
             ;;
         -v|--verbose)
             verbose=true
+            shift
+            ;;
+        -s|--stash)
+            stash=true
             shift
             ;;
         *)
