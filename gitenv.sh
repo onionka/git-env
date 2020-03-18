@@ -12,7 +12,7 @@ function show_help() {
       develop on each of them independently.
 
   Synopsis:
-    $ gitenv [-h|--help] [-v|--verbose] [-s|--stash] COMMANDS ARGS
+    $ gitenv [-h|--help] [-v|--verbose] [-s|--stash] COMMAND ARGS
 
   Switches:
     -h|--help                             Shows this help
@@ -21,7 +21,7 @@ function show_help() {
 
   Parameters:
 
-    COMMANDS                              There are 2 commands that are necessary for developing features:
+    COMMAND                               There are 2 commands that are necessary for developing features:
        push-feature-for TARGET_BRANCHES...   Creates a new branch from current branch, rebases it from BASE_BRANCH
                                              and pushes it to the remote so you can create new PR to the BASE_BRANCH
        create-feature ISSUE TYPE NAME        Creates a new feature from master branch
@@ -177,7 +177,7 @@ function push_feature_for() {
         fi
 
         # Updating branch
-        run git reset --hard ${target_branch}
+        run git reset --hard origin/${target_branch}
         run git cherry-pick ${COMMITS}
 
         # Pushing and returning back to the original branch
